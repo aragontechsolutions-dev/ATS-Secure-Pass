@@ -1,0 +1,50 @@
+diff --git a/node_modules/@sphereon/react-native-argon2/android/build.gradle b/node_modules/@sphereon/react-native-argon2/android/build.gradle
+index 2e53d16..eff463d 100644
+--- a/node_modules/@sphereon/react-native-argon2/android/build.gradle
++++ b/node_modules/@sphereon/react-native-argon2/android/build.gradle
+@@ -4,23 +4,13 @@ def safeExtGet(prop, fallback) {
+     rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+ }
+ 
+-buildscript {
+-    repositories {
+-        google()
+-        mavenCentral()
+-    }
+-    dependencies {
+-        classpath 'com.android.tools.build:gradle:4.1.0'
+-    }
+-}
+-
+ android {
+-    compileSdkVersion safeExtGet('compileSdkVersion', 30)
+-    buildToolsVersion safeExtGet('buildToolsVersion', '30.0.3')
++    namespace 'com.poowf.argon2'
++    compileSdkVersion safeExtGet('compileSdkVersion', 34)
+ 
+     defaultConfig {
+-        minSdkVersion safeExtGet('minSdkVersion', 16)
+-        targetSdkVersion safeExtGet('targetSdkVersion', 30)
++        minSdkVersion safeExtGet('minSdkVersion', 21)
++        targetSdkVersion safeExtGet('targetSdkVersion', 34)
+         versionCode 1
+         versionName '1.0'
+     }
+@@ -28,7 +18,7 @@ android {
+ 
+ repositories {
+     google()
+-    jcenter()
++    mavenCentral()
+ }
+ 
+ dependencies {
+diff --git a/node_modules/@sphereon/react-native-argon2/android/src/main/AndroidManifest.xml b/node_modules/@sphereon/react-native-argon2/android/src/main/AndroidManifest.xml
+index 7eb4fea..9a40236 100644
+--- a/node_modules/@sphereon/react-native-argon2/android/src/main/AndroidManifest.xml
++++ b/node_modules/@sphereon/react-native-argon2/android/src/main/AndroidManifest.xml
+@@ -1,3 +1,3 @@
+ <?xml version="1.0" encoding="utf-8"?>
+-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.poowf.argon2" >
++<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+ </manifest>
