@@ -87,6 +87,19 @@ export function SettingsScreen({ c }: { c: Controller }) {
           </Row>
         </Card>
 
+        {/* Copia de seguridad */}
+        <Card theme={theme}>
+          <Text style={[styles.section, { color: theme.text }]}>Copia de seguridad</Text>
+          <Text style={[styles.desc, { color: theme.muted }]}>
+            El backup incluye tu bóveda cifrada (SQLCipher) y solo se abre con tu contraseña
+            maestra. Guárdalo en un lugar seguro (Drive, correo…).
+          </Text>
+          <View style={styles.btnRow}>
+            <Button theme={theme} label="Exportar bóveda" onPress={c.exportBackup} disabled={c.busy} />
+            <Button theme={theme} label="Restaurar backup" kind="ghost" onPress={c.importBackup} disabled={c.busy} />
+          </View>
+        </Card>
+
         {/* Seguridad / diagnóstico */}
         <Card theme={theme}>
           <Text style={[styles.section, { color: theme.text }]}>Seguridad del dispositivo</Text>

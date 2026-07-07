@@ -70,6 +70,14 @@ export function OnboardingScreen({ c }: { c: Controller }) {
             style={{ marginTop: 4 }}
           />
         </Card>
+
+        <Card theme={theme}>
+          <Text style={[styles.intro, { color: theme.muted }]}>
+            ¿Ya tienes un backup de otra instalación? Restáuralo y desbloquéalo con tu contraseña
+            maestra.
+          </Text>
+          <Button theme={theme} label="Restaurar desde backup" kind="ghost" onPress={c.importBackup} disabled={c.busy} />
+        </Card>
       </ScrollView>
     </View>
   );

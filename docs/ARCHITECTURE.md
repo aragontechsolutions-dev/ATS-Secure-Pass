@@ -19,7 +19,7 @@ arquitectura y el estado de implementación por etapas.
 | 2 | Multi-usuario con aislamiento criptográfico | 🟡 Base lista (manifest + una BD/clave por usuario) |
 | 3 | **Biometría + Android Keystore (wrap de la DEK)** | ✅ Hecho |
 | 4 | **Hardening (FLAG_SECURE, portapapeles, auto-lock, root)** | ✅ Hecho |
-| 5 | Backup / restore cifrado | ⬜ Pendiente |
+| 5 | **Backup / restore cifrado** | ✅ Hecho |
 | 6 | UI/UX: shell de app con pantallas reales | 🟡 App real (Onboarding/Lock/Dashboard/Settings); falta pulido e iconos de marca |
 | 7 | Auditoría contra el perfil MAS-L2 del MASTG | ⬜ Pendiente |
 
@@ -116,6 +116,12 @@ src/
 ├── vault/
 │   ├── manifest.ts      # metadatos no secretos por usuario (salt, KDF, flag biometría)
 │   ├── vaultManager.ts  # crear / desbloquear / bloquear + activar/usar biometría
+│   └── index.ts
+├── backup/
+│   ├── envelope.ts    # formato del backup (JSON auto-contenido, puro + testeado)
+│   ├── backup.ts      # export: wal_checkpoint + base64 + expo-sharing
+│   ├── restore.ts     # import: expo-document-picker + escribir db + manifest
+│   ├── errors.ts      # BackupError
 │   └── index.ts
 ├── ui/
 │   ├── theme.ts          # paleta claro/oscuro + useTheme
@@ -259,9 +265,44 @@ Defensa en profundidad (OWASP MASTG, perfil MAS-L2):
 
 ---
 
-## Próximos pasos (Etapa 5 en adelante)
+## Backup / restore (Etapa 5)
 
-- **Backup**: `PRAGMA wal_checkpoint(FULL)` → copiar el `.db` (ya cifrado) con
-  `expo-file-system` → compartir con `expo-sharing`; import con
-  `expo-document-picker`.
-- **UI/UX (Etapa 6)** e **auditoría MAS-L2 (Etapa 7)**.
+Backup **auto-contenido y cifrado**. Punto de diseño clave: la clave se deriva de
+`master password + salt + parámetros`, y el salt/params viven en el manifiesto,
+no en el `.db`. Por eso el backup empaqueta AMBOS:
+
+```
+Sobre (JSON):
+{ format, version, createdAt,
+  user: { displayName, saltHex, kdf },   ← metadatos NO secretos
+  dbBase64 }                              ← archivo SQLCipher completo (cifrado)
+```
+
+- **Export** (`exportVault`): `PRAGMA wal_checkpoint(FULL)` para volcar el WAL →
+  leer el `.db` en base64 → `buildEnvelope` → escribir en caché → `expo-sharing`.
+  Nunca se exporta nada descifrado; el `.db` va cifrado con SQLCipher.
+- **Import** (`restoreVault`): `expo-document-picker` (con `copyToCacheDirectory`)
+  → `parseEnvelope` (valida formato/versión/salt/KDF) → escribir el `.db` con un
+  **id de usuario nuevo** (no sobrescribe nada) → registrar en el manifiesto. El
+  usuario desbloquea luego con su contraseña maestra.
+- **Zero-knowledge**: el sobre incluye salt/params en claro (no son secretos),
+  pero las credenciales están cifradas; sin la contraseña maestra el backup es
+  inútil. Apto para subir a la nube (E2E) en el futuro.
+
+### Checkpoint de seguridad de la Etapa 5
+
+1. **Round-trip.** Exporta la bóveda, desinstala/borra datos de la app,
+   reinstala, "Restaurar desde backup" → solo se abre con la contraseña maestra
+   correcta.
+2. **Aislado.** El backup no sobrescribe una bóveda existente: al restaurar se
+   crea un usuario nuevo (nombre único si colisiona).
+3. **Cifrado.** Abre el `.json` del backup: verás metadatos + un blob base64; la
+   BD (dentro) sigue siendo ilegible sin la clave.
+
+---
+
+## Próximos pasos (Etapa 7)
+
+- **UI/UX (Etapa 6, pulido)**: iconos de marca por credencial, animaciones
+  (Reanimated/Moti).
+- **Auditoría MAS-L2 (Etapa 7)**: revisar contra el MAS Checklist; MobSF.

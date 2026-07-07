@@ -19,6 +19,9 @@ extremo. Construido con **Expo (development build)** + **React Native** +
 - ✅ **Etapa 4** — Hardening: anti-captura (FLAG_SECURE), portapapeles con
   auto-borrado, auto-lock por segundo plano/inactividad y detección de root
   (jail-monkey).
+- ✅ **Etapa 5** — Backup/restore cifrado: exporta la bóveda (SQLCipher +
+  salt/params) a un archivo auto-contenido y compártelo; restaura desde archivo.
+  Zero-knowledge (solo se abre con la contraseña maestra).
 - 🟡 **Etapa 6 (parcial)** — App real con pantallas: Onboarding (crear bóveda),
   Bloqueo (huella automática + contraseña maestra), Dashboard (lista/añadir/
   copiar/mostrar credenciales) y Ajustes (⚙️). Falta pulido visual e iconos de

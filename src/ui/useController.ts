@@ -20,6 +20,7 @@ import {
   type NewCredential,
 } from '../db/credentials';
 import { InvalidMasterPasswordError } from '../db/errors';
+import { exportVault, restoreVault } from '../backup';
 import {
   clearClipboardNow,
   copyWithAutoClear,
@@ -77,6 +78,8 @@ export interface Controller {
   removeCredential: (id: string) => Promise<void>;
   copyPassword: (cred: Credential) => Promise<void>;
   runBenchmark: () => Promise<void>;
+  exportBackup: () => Promise<void>;
+  importBackup: () => Promise<void>;
 }
 
 function errorMessage(err: unknown): string {
@@ -328,6 +331,53 @@ export function useController(): Controller {
     [withBusy]
   );
 
+  const exportBackup = useCallback(
+    () =>
+      withBusy(async () => {
+        if (!session || !activeUser) return;
+        authInProgress.current = true; // compartir manda la app a segundo plano
+        try {
+          await exportVault(session, {
+            displayName: activeUser.displayName,
+            saltHex: activeUser.saltHex,
+            kdf: activeUser.kdf,
+          });
+          setNotice({ kind: 'success', text: 'Backup generado. Elige dónde guardarlo.' });
+        } catch (err) {
+          setNotice({ kind: 'error', text: errorMessage(err) });
+        } finally {
+          setTimeout(() => {
+            authInProgress.current = false;
+          }, 1000);
+        }
+      }),
+    [withBusy, session, activeUser]
+  );
+
+  const importBackup = useCallback(
+    () =>
+      withBusy(async () => {
+        authInProgress.current = true; // el selector de archivos backgroundea la app
+        try {
+          const res = await restoreVault();
+          if (!res) return; // el usuario canceló
+          await refreshUsers();
+          setActiveUserId(res.userId);
+          setNotice({
+            kind: 'success',
+            text: `Bóveda "${res.displayName}" restaurada. Desbloquéala con tu contraseña maestra.`,
+          });
+        } catch (err) {
+          setNotice({ kind: 'error', text: errorMessage(err) });
+        } finally {
+          setTimeout(() => {
+            authInProgress.current = false;
+          }, 1000);
+        }
+      }),
+    [withBusy, refreshUsers]
+  );
+
   const phase: AppPhase = loading
     ? 'loading'
     : session
@@ -365,5 +415,7 @@ export function useController(): Controller {
     removeCredential,
     copyPassword,
     runBenchmark,
+    exportBackup,
+    importBackup,
   };
 }
