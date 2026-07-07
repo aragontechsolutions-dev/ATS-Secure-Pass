@@ -6,7 +6,7 @@
  */
 import * as Crypto from 'expo-crypto';
 
-import { bytesToHex } from './encoding';
+import { encodeArgon2Salt } from './argon2Salt';
 import { SALT_BYTES } from './params';
 
 /** Devuelve `n` bytes aleatorios criptográficamente seguros. */
@@ -15,15 +15,12 @@ export function randomBytes(n: number): Uint8Array {
 }
 
 /**
- * Genera un salt aleatorio y lo devuelve como cadena hexadecimal.
- *
- * Se devuelve como hex (no como bytes crudos) porque `@sphereon/react-native-argon2`
- * consume el salt como una cadena y usa sus bytes UTF-8. Una cadena hex es ASCII,
- * estable entre plataformas y fácil de persistir. Con `SALT_BYTES` = 16 bytes de
- * entropía real → 32 caracteres hex.
+ * Genera un salt aleatorio de 32 bytes y lo devuelve codificado en el formato
+ * hexadecimal que espera el módulo nativo de Argon2 (ver `argon2Salt.ts`).
+ * El valor se persiste tal cual en el manifiesto (no es secreto).
  */
 export function generateSaltHex(): string {
-  return bytesToHex(randomBytes(SALT_BYTES));
+  return encodeArgon2Salt(randomBytes(SALT_BYTES));
 }
 
 /** Genera un identificador único (UUID v4) para un usuario/registro. */

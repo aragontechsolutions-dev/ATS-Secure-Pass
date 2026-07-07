@@ -12,6 +12,7 @@
  */
 import argon2 from '@sphereon/react-native-argon2';
 
+import { ARGON2_SALT_BYTES, encodeArgon2Salt } from './argon2Salt';
 import { Argon2idParams, isRawKeyHex, validateArgon2idParams } from './params';
 
 /**
@@ -68,8 +69,11 @@ export async function benchmarkArgon2id(
   samplePassword = 'benchmark-password'
 ): Promise<KdfBenchmark> {
   validateArgon2idParams(params);
-  // Salt fijo de 32 hex chars solo para el benchmark (no se persiste).
-  const salt = '00112233445566778899aabbccddeeff';
+  // Salt fijo (determinista) solo para el benchmark; no se persiste. Se codifica
+  // con el mismo formato que el resto para no disparar el underflow del nativo.
+  const fixedSaltBytes = new Uint8Array(ARGON2_SALT_BYTES);
+  for (let i = 0; i < fixedSaltBytes.length; i++) fixedSaltBytes[i] = (i * 7 + 1) & 0xff;
+  const salt = encodeArgon2Salt(fixedSaltBytes);
   const start = Date.now();
   await argon2(samplePassword, salt, {
     iterations: params.iterations,

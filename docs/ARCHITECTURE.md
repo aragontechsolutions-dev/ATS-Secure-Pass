@@ -34,7 +34,7 @@ usuario en la UI (Etapa 6).
 ```
 Master password ──┐
                   ├─► Argon2id(m=19MiB, t=2, p=1) ──► DEK (32 bytes / 64 hex)
-   Salt (16B) ────┘                                        │
+   Salt (32B) ────┘                                        │
                                                            ▼
                                      PRAGMA key = "x'<DEK hex>'"
                                                            │
@@ -43,7 +43,7 @@ Master password ──┐
 ```
 
 1. **Crear bóveda**: el usuario fija su master password → se genera un salt
-   aleatorio de 16 bytes (`expo-crypto`) → `DEK = Argon2id(masterPassword, salt)`
+   aleatorio de 32 bytes (`expo-crypto`) → `DEK = Argon2id(masterPassword, salt)`
    → se crea la BD SQLCipher con esa DEK como clave raw → se guardan en el
    manifiesto (en claro, no secretos) el salt y los parámetros KDF.
 2. **Desbloquear**: se leen salt + parámetros del manifiesto → se re-deriva la
@@ -74,6 +74,13 @@ Por defecto: perfil OWASP equilibrado **Argon2id m=19456 KiB (19 MiB), t=2, p=1*
 salida de 32 bytes. Son un **mínimo de arranque**: hay que calibrar con
 `benchmarkArgon2id()` en el dispositivo objetivo apuntando a **250–400 ms** por
 derivación. El banco de pruebas (`App.tsx`) incluye un botón "Benchmark KDF".
+
+> ⚠️ **Encoding del salt (específico de Android).** `@sphereon/react-native-argon2`
+> en Android interpreta el salt como `BigInteger(salt, 16).toByteArray()` y toma
+> los últimos 32 bytes; en iOS (CatCrypto) lo usa como UTF-8. Por eso el salt se
+> genera con `encodeArgon2Salt` (32 bytes aleatorios + 1 byte de framing → 66 hex
+> chars), garantizando ≥32 bytes y evitando el `ArrayIndexOutOfBounds`. Ver
+> `src/crypto/argon2Salt.ts`. Si se añade iOS habrá que unificar este manejo.
 
 ---
 

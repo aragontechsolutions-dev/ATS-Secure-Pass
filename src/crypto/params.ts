@@ -11,8 +11,11 @@
  * números a ciegas: los mínimos OWASP suben con el tiempo.
  */
 
-/** Longitud del salt en bytes (mínimo OWASP: 16). */
-export const SALT_BYTES = 16;
+/**
+ * Longitud del salt aleatorio en bytes. El módulo nativo de Argon2 fuerza un
+ * salt de 32 bytes (ver `argon2Salt.ts`), muy por encima del mínimo OWASP (16).
+ */
+export const SALT_BYTES = 32;
 
 /** Longitud de la clave derivada (DEK) en bytes → AES-256. */
 export const DEK_BYTES = 32;

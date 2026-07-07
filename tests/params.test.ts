@@ -13,7 +13,7 @@ import {
 } from '../src/crypto/params';
 
 test('constantes de tamaño', () => {
-  assert.equal(SALT_BYTES, 16);
+  assert.equal(SALT_BYTES, 32);
   assert.equal(DEK_BYTES, 32);
 });
 
