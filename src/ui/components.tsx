@@ -2,6 +2,7 @@
 import { ReactNode, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   StyleSheet,
   Text,
   TextInput,
@@ -10,7 +11,7 @@ import {
   type TextInputProps,
 } from 'react-native';
 
-import { FadeSlideIn } from './motion';
+import { FadeSlideIn, PopIn } from './motion';
 import type { Theme } from './theme';
 
 type ButtonKind = 'primary' | 'ghost' | 'danger';
@@ -216,6 +217,48 @@ export function Row({
   );
 }
 
+/** Diálogo de confirmación con el estilo de la app (sustituye a Alert nativo). */
+export function ConfirmDialog({
+  theme,
+  visible,
+  title,
+  message,
+  confirmLabel = 'Eliminar',
+  cancelLabel = 'Cancelar',
+  kind = 'danger',
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  theme: Theme;
+  visible: boolean;
+  title: string;
+  message?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  kind?: ButtonKind;
+  busy?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onCancel}>
+      <View style={styles.backdrop}>
+        <PopIn style={styles.dialogWrap}>
+          <View style={[styles.dialog, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Text style={[styles.dialogTitle, { color: theme.text }]}>{title}</Text>
+            {message ? <Text style={[styles.dialogMsg, { color: theme.muted }]}>{message}</Text> : null}
+            <View style={styles.dialogRow}>
+              <Button theme={theme} label={cancelLabel} kind="ghost" onPress={onCancel} disabled={busy} />
+              <Button theme={theme} label={confirmLabel} kind={kind} onPress={onConfirm} disabled={busy} loading={busy} />
+            </View>
+          </View>
+        </PopIn>
+      </View>
+    </Modal>
+  );
+}
+
 export const uiStyles = StyleSheet.create({
   buttonRow: { flexDirection: 'row', gap: 10 },
 });
@@ -267,4 +310,16 @@ const styles = StyleSheet.create({
   rowItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
   rowLabel: { fontSize: 15, fontWeight: '500' },
   rowValue: { fontSize: 13, marginTop: 2 },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 28,
+  },
+  dialogWrap: { width: '100%', maxWidth: 400 },
+  dialog: { borderWidth: 1, borderRadius: 18, padding: 20, gap: 12 },
+  dialogTitle: { fontSize: 18, fontWeight: '700' },
+  dialogMsg: { fontSize: 14.5, lineHeight: 21 },
+  dialogRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
 });

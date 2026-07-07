@@ -1,10 +1,10 @@
 /** Dashboard: bóveda desbloqueada. Busca, lista (paginada), añade, copia y revela. */
 import { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import type { Credential } from '../../db/credentials';
 import { BrandIcon } from '../brandIcon';
-import { Button, Card, Field, GearButton, Notice, PasswordField, ScreenHeader } from '../components';
+import { Button, Card, ConfirmDialog, Field, GearButton, Notice, PasswordField, ScreenHeader } from '../components';
 import { clampPage, filterCredentials, pageCount, paginate } from '../credentialQuery';
 import { FadeSlideIn } from '../motion';
 import type { Controller } from '../useController';
@@ -21,6 +21,7 @@ export function DashboardScreen({ c }: { c: Controller }) {
 
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
+  const [pendingDelete, setPendingDelete] = useState<Credential | null>(null);
 
   const filtered = useMemo(() => filterCredentials(c.credentials, query), [c.credentials, query]);
   const totalPages = pageCount(filtered.length, PAGE_SIZE);
@@ -40,15 +41,10 @@ export function DashboardScreen({ c }: { c: Controller }) {
     setPage(1);
   };
 
-  const confirmDelete = (cred: Credential) => {
-    Alert.alert(
-      'Eliminar credencial',
-      `¿Seguro que deseas eliminar "${cred.title}"? Esta acción no se puede deshacer.`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Eliminar', style: 'destructive', onPress: () => c.removeCredential(cred.id) },
-      ]
-    );
+  const doDelete = async () => {
+    const target = pendingDelete;
+    setPendingDelete(null);
+    if (target) await c.removeCredential(target.id);
   };
 
   const hasCreds = c.credentials.length > 0;
@@ -124,7 +120,7 @@ export function DashboardScreen({ c }: { c: Controller }) {
 
         {visible.map((cred, i) => (
           <FadeSlideIn key={cred.id} delay={Math.min(i * 45, 300)}>
-            <CredentialItem cred={cred} theme={theme} c={c} onDelete={confirmDelete} />
+            <CredentialItem cred={cred} theme={theme} c={c} onDelete={setPendingDelete} />
           </FadeSlideIn>
         ))}
 
@@ -152,6 +148,21 @@ export function DashboardScreen({ c }: { c: Controller }) {
 
         <Button theme={theme} label="🔒 Bloquear bóveda" kind="ghost" onPress={() => c.lock('manual')} />
       </ScrollView>
+
+      <ConfirmDialog
+        theme={theme}
+        visible={pendingDelete !== null}
+        title="Eliminar credencial"
+        message={
+          pendingDelete
+            ? `¿Seguro que deseas eliminar "${pendingDelete.title}"? Esta acción no se puede deshacer.`
+            : undefined
+        }
+        confirmLabel="Eliminar"
+        busy={c.busy}
+        onConfirm={doDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </View>
   );
 }
