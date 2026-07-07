@@ -1,13 +1,16 @@
-/** Dashboard: bóveda desbloqueada. Lista, añade, copia y revela credenciales. */
-import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+/** Dashboard: bóveda desbloqueada. Busca, lista (paginada), añade, copia y revela. */
+import { useMemo, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import type { Credential } from '../../db/credentials';
 import { BrandIcon } from '../brandIcon';
 import { Button, Card, Field, GearButton, Notice, PasswordField, ScreenHeader } from '../components';
+import { clampPage, filterCredentials, pageCount, paginate } from '../credentialQuery';
 import { FadeSlideIn } from '../motion';
 import type { Controller } from '../useController';
 import { useTheme, type Theme } from '../theme';
+
+const PAGE_SIZE = 10;
 
 export function DashboardScreen({ c }: { c: Controller }) {
   const { theme } = useTheme();
@@ -15,6 +18,14 @@ export function DashboardScreen({ c }: { c: Controller }) {
   const [title, setTitle] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+
+  const filtered = useMemo(() => filterCredentials(c.credentials, query), [c.credentials, query]);
+  const totalPages = pageCount(filtered.length, PAGE_SIZE);
+  const safePage = clampPage(page, filtered.length, PAGE_SIZE);
+  const visible = paginate(filtered, safePage, PAGE_SIZE);
 
   const resetForm = () => {
     setTitle('');
@@ -26,7 +37,21 @@ export function DashboardScreen({ c }: { c: Controller }) {
   const submit = async () => {
     await c.addCredential({ title: title.trim(), username: username.trim() || undefined, password });
     resetForm();
+    setPage(1);
   };
+
+  const confirmDelete = (cred: Credential) => {
+    Alert.alert(
+      'Eliminar credencial',
+      `¿Seguro que deseas eliminar "${cred.title}"? Esta acción no se puede deshacer.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Eliminar', style: 'destructive', onPress: () => c.removeCredential(cred.id) },
+      ]
+    );
+  };
+
+  const hasCreds = c.credentials.length > 0;
 
   return (
     <View style={[styles.root, { backgroundColor: theme.bg }]} onTouchStart={c.notifyActivity}>
@@ -68,7 +93,20 @@ export function DashboardScreen({ c }: { c: Controller }) {
           <Button theme={theme} label="＋ Añadir credencial" onPress={() => setAdding(true)} disabled={c.busy} />
         )}
 
-        {c.credentials.length === 0 && !adding ? (
+        {hasCreds ? (
+          <Field
+            theme={theme}
+            value={query}
+            onChangeText={(t) => {
+              setQuery(t);
+              setPage(1);
+            }}
+            autoCapitalize="none"
+            placeholder="🔍  Buscar por título, usuario o web…"
+          />
+        ) : null}
+
+        {!hasCreds && !adding ? (
           <Card theme={theme}>
             <Text style={[styles.empty, { color: theme.muted }]}>
               Aún no tienes credenciales. Pulsa “Añadir credencial”.
@@ -76,11 +114,41 @@ export function DashboardScreen({ c }: { c: Controller }) {
           </Card>
         ) : null}
 
-        {c.credentials.map((cred, i) => (
+        {hasCreds && filtered.length === 0 ? (
+          <Card theme={theme}>
+            <Text style={[styles.empty, { color: theme.muted }]}>
+              Sin resultados para “{query.trim()}”.
+            </Text>
+          </Card>
+        ) : null}
+
+        {visible.map((cred, i) => (
           <FadeSlideIn key={cred.id} delay={Math.min(i * 45, 300)}>
-            <CredentialItem cred={cred} theme={theme} c={c} />
+            <CredentialItem cred={cred} theme={theme} c={c} onDelete={confirmDelete} />
           </FadeSlideIn>
         ))}
+
+        {totalPages > 1 ? (
+          <View style={styles.pager}>
+            <Button
+              theme={theme}
+              label="‹ Anterior"
+              kind="ghost"
+              onPress={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={safePage <= 1}
+            />
+            <Text style={[styles.pagerText, { color: theme.muted }]}>
+              Página {safePage} de {totalPages}
+            </Text>
+            <Button
+              theme={theme}
+              label="Siguiente ›"
+              kind="ghost"
+              onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage >= totalPages}
+            />
+          </View>
+        ) : null}
 
         <Button theme={theme} label="🔒 Bloquear bóveda" kind="ghost" onPress={() => c.lock('manual')} />
       </ScrollView>
@@ -88,7 +156,17 @@ export function DashboardScreen({ c }: { c: Controller }) {
   );
 }
 
-function CredentialItem({ cred, theme, c }: { cred: Credential; theme: Theme; c: Controller }) {
+function CredentialItem({
+  cred,
+  theme,
+  c,
+  onDelete,
+}: {
+  cred: Credential;
+  theme: Theme;
+  c: Controller;
+  onDelete: (cred: Credential) => void;
+}) {
   const [visible, setVisible] = useState(false);
   return (
     <Card theme={theme} style={{ gap: 10 }}>
@@ -104,7 +182,7 @@ function CredentialItem({ cred, theme, c }: { cred: Credential; theme: Theme; c:
             </Text>
           ) : null}
         </View>
-        <TouchableOpacity onPress={() => c.removeCredential(cred.id)} disabled={c.busy} hitSlop={8}>
+        <TouchableOpacity onPress={() => onDelete(cred)} disabled={c.busy} hitSlop={8}>
           <Text style={{ fontSize: 18 }}>🗑️</Text>
         </TouchableOpacity>
       </View>
@@ -140,4 +218,6 @@ const styles = StyleSheet.create({
   credPw: { flex: 1, fontSize: 16, fontFamily: 'monospace', letterSpacing: 1 },
   credAction: { padding: 4 },
   copyBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 7 },
+  pager: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  pagerText: { fontSize: 13, textAlign: 'center', minWidth: 96 },
 });

@@ -95,9 +95,10 @@ export function SettingsScreen({ c }: { c: Controller }) {
             maestra. Guárdalo en un lugar seguro (Drive, correo…).
           </Text>
           <View style={styles.btnRow}>
-            <Button theme={theme} label="Exportar bóveda" onPress={c.exportBackup} disabled={c.busy} />
-            <Button theme={theme} label="Restaurar backup" kind="ghost" onPress={c.importBackup} disabled={c.busy} />
+            <Button theme={theme} label="Compartir backup" onPress={c.exportBackup} disabled={c.busy} />
+            <Button theme={theme} label="Guardar en teléfono" onPress={c.saveBackupToDevice} disabled={c.busy} />
           </View>
+          <Button theme={theme} label="Restaurar desde backup" kind="ghost" onPress={c.importBackup} disabled={c.busy} />
         </Card>
 
         {/* Seguridad / diagnóstico */}

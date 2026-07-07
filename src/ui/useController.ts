@@ -20,7 +20,7 @@ import {
   type NewCredential,
 } from '../db/credentials';
 import { InvalidMasterPasswordError } from '../db/errors';
-import { exportVault, restoreVault } from '../backup';
+import { exportVault, restoreVault, saveVaultToDevice } from '../backup';
 import {
   clearClipboardNow,
   copyWithAutoClear,
@@ -79,6 +79,7 @@ export interface Controller {
   copyPassword: (cred: Credential) => Promise<void>;
   runBenchmark: () => Promise<void>;
   exportBackup: () => Promise<void>;
+  saveBackupToDevice: () => Promise<void>;
   importBackup: () => Promise<void>;
 }
 
@@ -89,7 +90,8 @@ function errorMessage(err: unknown): string {
 export function useController(): Controller {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<Notice | null>(null);
+  const [notice, setNoticeState] = useState<Notice | null>(null);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [activeUserId, setActiveUserId] = useState<string | null>(null);
   const [cap, setCap] = useState<BiometricCapability | null>(null);
@@ -103,6 +105,26 @@ export function useController(): Controller {
   // Evita que el auto-lock se dispare mientras un prompt biométrico manda la app
   // a segundo plano (el OS backgroundea la app durante la autenticación).
   const authInProgress = useRef(false);
+
+  /**
+   * Muestra un aviso y lo oculta solo tras unos segundos (los errores duran algo
+   * más). Pasar `null` lo oculta de inmediato.
+   */
+  const showNotice = useCallback((n: Notice | null) => {
+    if (noticeTimer.current) {
+      clearTimeout(noticeTimer.current);
+      noticeTimer.current = null;
+    }
+    setNoticeState(n);
+    if (n) {
+      const ms = n.kind === 'error' ? 6000 : n.kind === 'warning' ? 5000 : 3500;
+      noticeTimer.current = setTimeout(() => setNoticeState(null), ms);
+    }
+  }, []);
+
+  useEffect(() => () => {
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+  }, []);
 
   const activeUser = useMemo(
     () => users.find((u) => u.id === activeUserId),
@@ -124,7 +146,7 @@ export function useController(): Controller {
         setCap(await getBiometricCapability());
         setIntegrity(getDeviceIntegrity());
       } catch (err) {
-        setNotice({ kind: 'error', text: errorMessage(err) });
+        showNotice({ kind: 'error', text: errorMessage(err) });
       } finally {
         setLoading(false);
       }
@@ -145,7 +167,7 @@ export function useController(): Controller {
       setRoute('dashboard');
       await clearClipboardNow();
       if (reason !== 'silent') {
-        setNotice({ kind: 'info', text: 'Bóveda bloqueada.' });
+        showNotice({ kind: 'info', text: 'Bóveda bloqueada.' });
       }
     },
     [session]
@@ -181,9 +203,9 @@ export function useController(): Controller {
           setSession(s);
           await refreshCreds(s);
           setRoute('dashboard');
-          setNotice({ kind: 'success', text: `Bóveda creada para "${s.displayName}".` });
+          showNotice({ kind: 'success', text: `Bóveda creada para "${s.displayName}".` });
         } catch (err) {
-          setNotice({ kind: 'error', text: errorMessage(err) });
+          showNotice({ kind: 'error', text: errorMessage(err) });
         }
       }),
     [withBusy, refreshUsers, refreshCreds]
@@ -198,13 +220,13 @@ export function useController(): Controller {
           setSession(s);
           await refreshCreds(s);
           setRoute('dashboard');
-          setNotice(null);
+          showNotice(null);
         } catch (err) {
           if (err instanceof InvalidMasterPasswordError) {
-            setNotice({ kind: 'error', text: 'Contraseña maestra incorrecta.' });
+            showNotice({ kind: 'error', text: 'Contraseña maestra incorrecta.' });
             return;
           }
-          setNotice({ kind: 'error', text: errorMessage(err) });
+          showNotice({ kind: 'error', text: errorMessage(err) });
         }
       }),
     [withBusy, activeUserId, refreshCreds]
@@ -219,22 +241,22 @@ export function useController(): Controller {
       setSession(s);
       await refreshCreds(s);
       setRoute('dashboard');
-      setNotice(null);
+      showNotice(null);
       ok = true;
     } catch (err) {
       if (err instanceof BiometricUnlockError) {
         if (err.reason === 'invalidated') {
-          setNotice({
+          showNotice({
             kind: 'warning',
             text: 'Tu biometría cambió. Entra con la contraseña maestra y vuelve a activarla.',
           });
         } else if (err.reason === 'not-enrolled') {
           // silencioso: simplemente no había biometría configurada
         } else if (err.reason !== 'failed') {
-          setNotice({ kind: 'error', text: err.message });
+          showNotice({ kind: 'error', text: err.message });
         }
       } else {
-        setNotice({ kind: 'error', text: errorMessage(err) });
+        showNotice({ kind: 'error', text: errorMessage(err) });
       }
     } finally {
       // Deja un margen para que AppState vuelva a 'active' sin disparar auto-lock.
@@ -253,14 +275,14 @@ export function useController(): Controller {
         try {
           await enableBiometricUnlock(activeUserId, password);
           await refreshUsers();
-          setNotice({ kind: 'success', text: 'Biometría activada.' });
+          showNotice({ kind: 'success', text: 'Biometría activada.' });
         } catch (err) {
           if (err instanceof InvalidMasterPasswordError) {
-            setNotice({ kind: 'error', text: 'Contraseña maestra incorrecta.' });
+            showNotice({ kind: 'error', text: 'Contraseña maestra incorrecta.' });
           } else if (err instanceof BiometricUnlockError) {
-            setNotice({ kind: 'error', text: err.message });
+            showNotice({ kind: 'error', text: err.message });
           } else {
-            setNotice({ kind: 'error', text: errorMessage(err) });
+            showNotice({ kind: 'error', text: errorMessage(err) });
           }
         } finally {
           setTimeout(() => {
@@ -277,7 +299,7 @@ export function useController(): Controller {
         if (!activeUserId) return;
         await disableBiometricUnlock(activeUserId);
         await refreshUsers();
-        setNotice({ kind: 'info', text: 'Biometría desactivada.' });
+        showNotice({ kind: 'info', text: 'Biometría desactivada.' });
       }),
     [withBusy, activeUserId, refreshUsers]
   );
@@ -288,7 +310,7 @@ export function useController(): Controller {
         if (!session) return;
         await createCredential(session.db, input);
         await refreshCreds(session);
-        setNotice({ kind: 'success', text: `"${input.title}" guardada.` });
+        showNotice({ kind: 'success', text: `"${input.title}" guardada.` });
       }),
     [withBusy, session, refreshCreds]
   );
@@ -307,7 +329,7 @@ export function useController(): Controller {
     (cred: Credential) =>
       withBusy(async () => {
         const { ttlMs } = await copyWithAutoClear(cred.password);
-        setNotice({
+        showNotice({
           kind: 'info',
           text: `Contraseña copiada. Se limpiará en ${Math.round(ttlMs / 1000)} s.`,
         });
@@ -321,7 +343,7 @@ export function useController(): Controller {
         const { durationMs, params } = await benchmarkArgon2id(DEFAULT_ARGON2ID_PARAMS);
         setLastBenchmarkMs(durationMs);
         const inWindow = durationMs >= 250 && durationMs <= 400;
-        setNotice({
+        showNotice({
           kind: inWindow ? 'success' : 'warning',
           text: `Argon2id (t=${params.iterations}): ${durationMs} ms ${
             inWindow ? '· en ventana ✅' : '· fuera de 250–400 ms'
@@ -342,9 +364,34 @@ export function useController(): Controller {
             saltHex: activeUser.saltHex,
             kdf: activeUser.kdf,
           });
-          setNotice({ kind: 'success', text: 'Backup generado. Elige dónde guardarlo.' });
+          showNotice({ kind: 'success', text: 'Backup generado. Elige dónde guardarlo.' });
         } catch (err) {
-          setNotice({ kind: 'error', text: errorMessage(err) });
+          showNotice({ kind: 'error', text: errorMessage(err) });
+        } finally {
+          setTimeout(() => {
+            authInProgress.current = false;
+          }, 1000);
+        }
+      }),
+    [withBusy, session, activeUser]
+  );
+
+  const saveBackupToDevice = useCallback(
+    () =>
+      withBusy(async () => {
+        if (!session || !activeUser) return;
+        authInProgress.current = true; // el selector de carpeta backgroundea la app
+        try {
+          const savedName = await saveVaultToDevice(session, {
+            displayName: activeUser.displayName,
+            saltHex: activeUser.saltHex,
+            kdf: activeUser.kdf,
+          });
+          if (savedName) {
+            showNotice({ kind: 'success', text: `Guardado en el teléfono como "${savedName}".` });
+          }
+        } catch (err) {
+          showNotice({ kind: 'error', text: errorMessage(err) });
         } finally {
           setTimeout(() => {
             authInProgress.current = false;
@@ -363,12 +410,12 @@ export function useController(): Controller {
           if (!res) return; // el usuario canceló
           await refreshUsers();
           setActiveUserId(res.userId);
-          setNotice({
+          showNotice({
             kind: 'success',
             text: `Bóveda "${res.displayName}" restaurada. Desbloquéala con tu contraseña maestra.`,
           });
         } catch (err) {
-          setNotice({ kind: 'error', text: errorMessage(err) });
+          showNotice({ kind: 'error', text: errorMessage(err) });
         } finally {
           setTimeout(() => {
             authInProgress.current = false;
@@ -403,7 +450,7 @@ export function useController(): Controller {
     setActiveUserId,
     setRoute,
     setAutoLockOn,
-    dismissNotice: () => setNotice(null),
+    dismissNotice: () => showNotice(null),
     notifyActivity,
     createFirstVault,
     unlockWithPassword,
@@ -416,6 +463,7 @@ export function useController(): Controller {
     copyPassword,
     runBenchmark,
     exportBackup,
+    saveBackupToDevice,
     importBackup,
   };
 }

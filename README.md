@@ -23,10 +23,12 @@ extremo. Construido con **Expo (development build)** + **React Native** +
   salt/params) a un archivo auto-contenido y compártelo; restaura desde archivo.
   Zero-knowledge (solo se abre con la contraseña maestra).
 - ✅ **Etapa 6** — App real con pantallas: Onboarding (crear bóveda), Bloqueo
-  (huella automática + contraseña maestra), Dashboard (lista/añadir/copiar/
-  mostrar credenciales) y Ajustes (⚙️). Iconos de marca reales (logos de
-  GitHub, Netflix, Spotify… vía simple-icons) con avatar de letra de fallback,
-  y animaciones suaves (`Animated` nativo).
+  (huella automática + contraseña maestra), Dashboard (buscador, paginación
+  10/página, copiar/mostrar credenciales, confirmación al eliminar) y Ajustes
+  (⚙️). Iconos de marca reales (logos de GitHub, Netflix, Spotify… vía
+  simple-icons) con avatar de letra de fallback, y animaciones suaves
+  (`Animated` nativo). Avisos que se ocultan solos. Backup: compartir o guardar
+  en una carpeta del teléfono.
 
 El detalle de la arquitectura y la hoja de ruta por etapas está en
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
