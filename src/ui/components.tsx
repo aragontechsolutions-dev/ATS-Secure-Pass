@@ -10,6 +10,7 @@ import {
   type TextInputProps,
 } from 'react-native';
 
+import { FadeSlideIn } from './motion';
 import type { Theme } from './theme';
 
 type ButtonKind = 'primary' | 'ghost' | 'danger';
@@ -184,9 +185,11 @@ export function Notice({
   const color =
     kind === 'error' ? theme.danger : kind === 'success' ? theme.success : kind === 'warning' ? theme.warning : theme.muted;
   return (
-    <View style={[styles.notice, { borderColor: color, backgroundColor: theme.cardAlt }]}>
-      <Text style={[styles.noticeText, { color }]}>{children}</Text>
-    </View>
+    <FadeSlideIn>
+      <View style={[styles.notice, { borderColor: color, backgroundColor: theme.cardAlt }]}>
+        <Text style={[styles.noticeText, { color }]}>{children}</Text>
+      </View>
+    </FadeSlideIn>
   );
 }
 

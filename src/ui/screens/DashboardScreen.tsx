@@ -3,7 +3,9 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import type { Credential } from '../../db/credentials';
+import { BrandIcon } from '../brandIcon';
 import { Button, Card, Field, GearButton, Notice, PasswordField, ScreenHeader } from '../components';
+import { FadeSlideIn } from '../motion';
 import type { Controller } from '../useController';
 import { useTheme, type Theme } from '../theme';
 
@@ -74,8 +76,10 @@ export function DashboardScreen({ c }: { c: Controller }) {
           </Card>
         ) : null}
 
-        {c.credentials.map((cred) => (
-          <CredentialItem key={cred.id} cred={cred} theme={theme} c={c} />
+        {c.credentials.map((cred, i) => (
+          <FadeSlideIn key={cred.id} delay={Math.min(i * 45, 300)}>
+            <CredentialItem cred={cred} theme={theme} c={c} />
+          </FadeSlideIn>
         ))}
 
         <Button theme={theme} label="🔒 Bloquear bóveda" kind="ghost" onPress={() => c.lock('manual')} />
@@ -87,21 +91,28 @@ export function DashboardScreen({ c }: { c: Controller }) {
 function CredentialItem({ cred, theme, c }: { cred: Credential; theme: Theme; c: Controller }) {
   const [visible, setVisible] = useState(false);
   return (
-    <Card theme={theme} style={{ gap: 6 }}>
+    <Card theme={theme} style={{ gap: 10 }}>
       <View style={styles.credHead}>
-        <Text style={[styles.credTitle, { color: theme.text }]}>{cred.title}</Text>
-        <TouchableOpacity onPress={() => c.removeCredential(cred.id)} disabled={c.busy}>
+        <BrandIcon title={cred.title} url={cred.url} size={44} />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.credTitle, { color: theme.text }]} numberOfLines={1}>
+            {cred.title}
+          </Text>
+          {cred.username ? (
+            <Text style={[styles.credMeta, { color: theme.muted }]} numberOfLines={1}>
+              {cred.username}
+            </Text>
+          ) : null}
+        </View>
+        <TouchableOpacity onPress={() => c.removeCredential(cred.id)} disabled={c.busy} hitSlop={8}>
           <Text style={{ fontSize: 18 }}>🗑️</Text>
         </TouchableOpacity>
       </View>
-      {cred.username ? (
-        <Text style={[styles.credMeta, { color: theme.muted }]}>{cred.username}</Text>
-      ) : null}
       <View style={styles.credPwRow}>
         <Text style={[styles.credPw, { color: theme.text }]}>
           {visible ? cred.password : '•'.repeat(Math.min(cred.password.length, 12))}
         </Text>
-        <TouchableOpacity onPress={() => setVisible((v) => !v)} style={styles.credAction}>
+        <TouchableOpacity onPress={() => setVisible((v) => !v)} style={styles.credAction} hitSlop={8}>
           <Text style={{ fontSize: 18 }}>{visible ? '🙈' : '👁️'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -122,7 +133,7 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: '600' },
   btnRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
   empty: { fontSize: 14, textAlign: 'center', paddingVertical: 8 },
-  credHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  credHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   credTitle: { fontSize: 17, fontWeight: '600' },
   credMeta: { fontSize: 14 },
   credPwRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 },

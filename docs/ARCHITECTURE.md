@@ -126,6 +126,10 @@ src/
 ├── ui/
 │   ├── theme.ts          # paleta claro/oscuro + useTheme
 │   ├── components.tsx    # Button, Card, Field, PasswordField (ojo), GearButton, …
+│   ├── motion.tsx        # animaciones (FadeSlideIn, PopIn) con Animated nativo
+│   ├── brandIcon.tsx     # icono de marca (logo SVG) o avatar de letra
+│   ├── brandResolve.ts   # resolución marca por título/URL (pura, testeada)
+│   ├── brandData.ts      # datos de logos (set curado de simple-icons, generado)
 │   ├── useController.ts  # estado global + acciones (el "cerebro" de la app)
 │   └── screens/
 │       ├── OnboardingScreen.tsx  # crear la primera bóveda

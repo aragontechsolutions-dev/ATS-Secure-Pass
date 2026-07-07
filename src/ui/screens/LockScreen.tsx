@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { Button, Card, Notice, PasswordField, ScreenHeader } from '../components';
+import { PopIn } from '../motion';
 import type { Controller } from '../useController';
 import { useTheme } from '../theme';
 
@@ -33,7 +34,9 @@ export function LockScreen({ c }: { c: Controller }) {
     <View style={[styles.root, { backgroundColor: theme.bg }]}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.hero}>
-          <Text style={styles.lockIcon}>🔒</Text>
+          <PopIn>
+            <Text style={styles.lockIcon}>🔒</Text>
+          </PopIn>
           <ScreenHeader theme={theme} title="ATS Secure Pass" subtitle="Desbloquea tu bóveda" />
         </View>
 

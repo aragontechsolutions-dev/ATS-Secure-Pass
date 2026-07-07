@@ -22,10 +22,11 @@ extremo. Construido con **Expo (development build)** + **React Native** +
 - ✅ **Etapa 5** — Backup/restore cifrado: exporta la bóveda (SQLCipher +
   salt/params) a un archivo auto-contenido y compártelo; restaura desde archivo.
   Zero-knowledge (solo se abre con la contraseña maestra).
-- 🟡 **Etapa 6 (parcial)** — App real con pantallas: Onboarding (crear bóveda),
-  Bloqueo (huella automática + contraseña maestra), Dashboard (lista/añadir/
-  copiar/mostrar credenciales) y Ajustes (⚙️). Falta pulido visual e iconos de
-  marca.
+- ✅ **Etapa 6** — App real con pantallas: Onboarding (crear bóveda), Bloqueo
+  (huella automática + contraseña maestra), Dashboard (lista/añadir/copiar/
+  mostrar credenciales) y Ajustes (⚙️). Iconos de marca reales (logos de
+  GitHub, Netflix, Spotify… vía simple-icons) con avatar de letra de fallback,
+  y animaciones suaves (`Animated` nativo).
 
 El detalle de la arquitectura y la hoja de ruta por etapas está en
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
