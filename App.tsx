@@ -36,6 +36,14 @@ import { countCredentials, createCredential, listCredentials } from './src/db/cr
 import { InvalidMasterPasswordError } from './src/db/errors';
 import type { Credential } from './src/db/credentials';
 import {
+  clearClipboardNow,
+  copyWithAutoClear,
+  enableScreenProtection,
+  getDeviceIntegrity,
+  useAutoLock,
+  type DeviceIntegrity,
+} from './src/security';
+import {
   createVault,
   disableBiometricUnlock,
   enableBiometricUnlock,
@@ -63,6 +71,8 @@ export default function App() {
 
   const [cap, setCap] = useState<BiometricCapability | null>(null);
   const [users, setUsers] = useState<UserRecord[]>([]);
+  const [integrity, setIntegrity] = useState<DeviceIntegrity | null>(null);
+  const [autoLockOn, setAutoLockOn] = useState(false);
 
   const append = useCallback((line: string) => {
     setLog((prev) => [`${new Date().toLocaleTimeString()}  ${line}`, ...prev].slice(0, 40));
@@ -73,6 +83,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // Hardening al arrancar: FLAG_SECURE (anti-captura) + chequeo de integridad.
+    enableScreenProtection().catch(() => undefined);
+    setIntegrity(getDeviceIntegrity());
     getBiometricCapability().then(setCap).catch(() => setCap(null));
     refreshUsers();
   }, [refreshUsers]);
@@ -206,14 +219,29 @@ export default function App() {
       }
     });
 
-  const onLock = () =>
-    run('bloquear', async () => {
+  const lockNow = useCallback(
+    async (reason: string) => {
       if (!session) return;
       await lockVault(session);
       setSession(null);
       setCredentials([]);
-      append('🔒 Bóveda bloqueada (conexión cerrada, DEK fuera de memoria)');
-    });
+      await clearClipboardNow();
+      append(`🔒 Bóveda bloqueada (${reason}; DEK fuera de memoria, portapapeles limpio)`);
+    },
+    [session, append]
+  );
+
+  const onLock = () => run('bloquear', () => lockNow('manual'));
+
+  // Auto-lock: bloquea al ir a segundo plano y tras 30 s de inactividad.
+  const { notifyActivity } = useAutoLock({
+    enabled: autoLockOn && !!session,
+    backgroundGraceMs: 0,
+    inactivityMs: 30_000,
+    onLock: () => {
+      lockNow('auto-lock').catch(() => undefined);
+    },
+  });
 
   const onAddCredential = () =>
     run('guardar credencial', async () => {
@@ -237,13 +265,24 @@ export default function App() {
       append(`💾 Credencial "${credTitle}" guardada (cifrada en disco)`);
     });
 
+  const onCopyPassword = (cred: Credential) =>
+    run('copiar', async () => {
+      const { ttlMs } = await copyWithAutoClear(cred.password);
+      append(`📋 Contraseña de "${cred.title}" copiada (se limpia en ${ttlMs / 1000}s)`);
+    });
+
   return (
     <View style={[styles.root, { backgroundColor: c.bg }]}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        onScrollBeginDrag={notifyActivity}
+        onTouchStart={notifyActivity}
+      >
         <Text style={[styles.title, { color: c.text }]}>ATS Secure Pass</Text>
         <Text style={[styles.subtitle, { color: c.muted }]}>
-          Etapas 1 + 3 · Núcleo criptográfico y biometría
+          Etapas 1 + 3 + 4 · Cripto, biometría y hardening
         </Text>
 
         <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -371,14 +410,47 @@ export default function App() {
             </Text>
             {credentials.map((cred) => (
               <View key={cred.id} style={[styles.credItem, { borderColor: c.border }]}>
-                <Text style={[styles.credTitle, { color: c.text }]}>{cred.title}</Text>
-                <Text style={[styles.credMeta, { color: c.muted }]}>
-                  {cred.username ?? '—'} · {'•'.repeat(Math.min(cred.password.length, 10))}
-                </Text>
+                <View style={styles.credRow}>
+                  <View style={styles.credInfo}>
+                    <Text style={[styles.credTitle, { color: c.text }]}>{cred.title}</Text>
+                    <Text style={[styles.credMeta, { color: c.muted }]}>
+                      {cred.username ?? '—'} · {'•'.repeat(Math.min(cred.password.length, 10))}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => onCopyPassword(cred)}
+                    disabled={busy}
+                    style={[styles.copyBtn, { borderColor: c.accent, opacity: busy ? 0.4 : 1 }]}
+                  >
+                    <Text style={[styles.buttonText, { color: c.accent }]}>Copiar</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ))}
           </View>
         )}
+
+        <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+          <Text style={[styles.cardTitle, { color: c.text }]}>Hardening</Text>
+          <Text style={[styles.credMeta, { color: c.muted }]}>
+            🛡️ Anti-captura (FLAG_SECURE): activo · intenta hacer una captura → debe fallar
+          </Text>
+          <Text style={[styles.credMeta, { color: c.muted }]}>
+            {integrity
+              ? integrity.isCompromised
+                ? `⚠️ Dispositivo comprometido (root:${integrity.isJailBroken ? 'sí' : 'no'} · hook:${integrity.isHooked ? 'sí' : 'no'})`
+                : '✅ Integridad OK (sin root/hook detectado)'
+              : 'Comprobando integridad…'}
+          </Text>
+          <TouchableOpacity
+            onPress={() => setAutoLockOn((v) => !v)}
+            style={[styles.button, { backgroundColor: autoLockOn ? c.accent : 'transparent', borderColor: c.accent, marginTop: 8 }]}
+          >
+            <Text style={[styles.buttonText, { color: autoLockOn ? '#fff' : c.accent }]}>
+              Auto-lock: {autoLockOn ? 'ON (background + 30s)' : 'OFF'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={[styles.cardTitle, { color: c.text }]}>Registro</Text>
@@ -468,7 +540,15 @@ const styles = StyleSheet.create({
   },
   buttonText: { fontSize: 15, fontWeight: '600' },
   credItem: { borderTopWidth: 1, paddingVertical: 8 },
+  credRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  credInfo: { flex: 1, paddingRight: 10 },
   credTitle: { fontSize: 15, fontWeight: '500' },
   credMeta: { fontSize: 13, marginTop: 2 },
+  copyBtn: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
   logLine: { fontSize: 12, fontFamily: 'monospace', marginBottom: 2 },
 });

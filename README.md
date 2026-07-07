@@ -16,6 +16,9 @@ extremo. Construido con **Expo (development build)** + **React Native** +
 - ✅ **Etapa 3** — Biometría + Android Keystore: la DEK se envuelve tras
   `expo-secure-store` (`requireAuthentication`); la biometría desbloquea la
   clave, con fallback obligatorio al master password.
+- ✅ **Etapa 4** — Hardening: anti-captura (FLAG_SECURE), portapapeles con
+  auto-borrado, auto-lock por segundo plano/inactividad y detección de root
+  (jail-monkey).
 
 El detalle de la arquitectura y la hoja de ruta por etapas está en
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).

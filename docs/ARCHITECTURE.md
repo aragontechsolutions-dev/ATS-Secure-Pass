@@ -18,7 +18,7 @@ arquitectura y el estado de implementación por etapas.
 | 1 | **BD cifrada (SQLCipher) + KDF (Argon2id)** | ✅ Hecho (este entregable) |
 | 2 | Multi-usuario con aislamiento criptográfico | 🟡 Base lista (manifest + una BD/clave por usuario) |
 | 3 | **Biometría + Android Keystore (wrap de la DEK)** | ✅ Hecho |
-| 4 | Hardening (FLAG_SECURE, portapapeles, auto-lock, root) | ⬜ Pendiente |
+| 4 | **Hardening (FLAG_SECURE, portapapeles, auto-lock, root)** | ✅ Hecho |
 | 5 | Backup / restore cifrado | ⬜ Pendiente |
 | 6 | UI/UX final (iconos de marca, mostrar/ocultar, copiar) | ⬜ Pendiente |
 | 7 | Auditoría contra el perfil MAS-L2 del MASTG | ⬜ Pendiente |
@@ -104,6 +104,14 @@ src/
 │   ├── biometrics.ts  # capacidades biométricas (expo-local-authentication)
 │   ├── dekStore.ts    # DEK protegida por Keystore (secure-store + requireAuthentication)
 │   ├── errors.ts      # BiometricUnlockError (reason: invalidated, failed, …)
+│   └── index.ts
+├── security/
+│   ├── screenCapture.ts  # FLAG_SECURE (expo-screen-capture)
+│   ├── clipboard.ts      # copiar con auto-borrado (expo-clipboard + timer)
+│   ├── clipboardCore.ts  # lógica pura del portapapeles (testeada)
+│   ├── autoLock.ts       # hook useAutoLock (AppState: background + inactividad)
+│   ├── autoLockCore.ts   # lógica pura del auto-lock (testeada)
+│   ├── rootDetection.ts  # integridad del dispositivo (jail-monkey)
 │   └── index.ts
 ├── vault/
 │   ├── manifest.ts      # metadatos no secretos por usuario (salt, KDF, flag biometría)
@@ -192,9 +200,43 @@ Fallback:     si la biometría falla / se invalida  →  master password (re-der
 
 ---
 
-## Próximos pasos (Etapa 4 en adelante)
+## Hardening (Etapa 4)
 
-- **Hardening**: `expo-screen-capture` (FLAG_SECURE), limpieza del portapapeles
-  con timer, auto-lock por inactividad (`AppState`), `jail-monkey`.
+Defensa en profundidad (OWASP MASTG, perfil MAS-L2):
+
+- **Anti-captura (FLAG_SECURE).** `enableScreenProtection` llama a
+  `preventScreenCaptureAsync`: bloquea screenshots/grabación y muestra pantalla
+  en blanco en el app switcher. Se activa al arrancar la app.
+- **Portapapeles con auto-borrado.** `copyWithAutoClear` copia la contraseña y
+  programa limpiar el portapapeles a los 25 s, y solo lo limpia si el contenido
+  sigue siendo el que copiamos (`shouldClearClipboard`). Al bloquear la bóveda se
+  limpia de inmediato. `expo-clipboard` no expone TTL ni el flag "sensible"; el
+  borrado es responsabilidad de la app.
+- **Auto-lock.** `useAutoLock` (API `AppState`) bloquea al ir a segundo plano
+  (`backgroundGraceMs = 0`) y tras inactividad. Como los `setTimeout` se pausan en
+  background, se compara un timestamp al volver (`isInactivityExpired`). Bloquear
+  = cerrar la BD, soltar la DEK y limpiar el portapapeles.
+- **Detección de root.** `getDeviceIntegrity` usa `jail-monkey`
+  (`isJailBroken`/`trustFall`/`hookDetected`). Es DEFENSA EN PROFUNDIDAD, no una
+  garantía: los checks client-side son bypasseables en un dispositivo
+  comprometido.
+
+### Checkpoint de seguridad de la Etapa 4
+
+1. **Captura bloqueada.** Intenta hacer un screenshot → debe fallar / salir en
+   negro; en apps recientes la preview se ve en blanco.
+2. **Portapapeles.** Copia una contraseña, espera 25 s, pega en otra app → debe
+   estar vacío. Bloquea la bóveda → se limpia de inmediato.
+3. **Auto-lock.** Con "Auto-lock ON": manda la app a segundo plano y vuelve → la
+   bóveda debe estar bloqueada; o espera 30 s sin tocar → se bloquea sola.
+4. **Integridad.** En un dispositivo con root, el estado debe avisar
+   "Dispositivo comprometido".
+
+---
+
+## Próximos pasos (Etapa 5 en adelante)
+
 - **Backup**: `PRAGMA wal_checkpoint(FULL)` → copiar el `.db` (ya cifrado) con
-  `expo-file-system` → compartir con `expo-sharing`.
+  `expo-file-system` → compartir con `expo-sharing`; import con
+  `expo-document-picker`.
+- **UI/UX (Etapa 6)** e **auditoría MAS-L2 (Etapa 7)**.
