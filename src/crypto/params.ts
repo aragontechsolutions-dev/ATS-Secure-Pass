@@ -72,8 +72,26 @@ export const OWASP_ARGON2ID_HIGH_MEMORY: Argon2idParams = {
   version: ARGON2_VERSION,
 };
 
+/**
+ * Perfil calibrado para el dispositivo de referencia.
+ *
+ * Benchmark medido: m=19456/t=2 → ~221 ms (justo por debajo de la ventana
+ * 250–400 ms). Como el tiempo de Argon2 escala ≈ con `memoria × iteraciones`,
+ * subir a t=3 lo lleva a ~330 ms, en el centro de la ventana, sin aumentar el
+ * consumo de RAM (mejor para gama media/baja). Recalibra con `benchmarkArgon2id`
+ * si tu hardware objetivo difiere.
+ */
+export const CALIBRATED_ARGON2ID_PARAMS: Argon2idParams = {
+  algorithm: 'argon2id',
+  memoryKiB: 19456, // 19 MiB
+  iterations: 3,
+  parallelism: 1,
+  hashLength: DEK_BYTES,
+  version: ARGON2_VERSION,
+};
+
 /** Parámetros por defecto usados al crear un nuevo usuario. */
-export const DEFAULT_ARGON2ID_PARAMS: Argon2idParams = OWASP_ARGON2ID_BALANCED;
+export const DEFAULT_ARGON2ID_PARAMS: Argon2idParams = CALIBRATED_ARGON2ID_PARAMS;
 
 /** Ventana objetivo (ms) para una derivación en el dispositivo objetivo. */
 export const TARGET_KDF_MIN_MS = 250;
