@@ -22,6 +22,8 @@ export interface UserRecord {
   saltHex: string;
   kdf: Argon2idParams;
   createdAt: number;
+  /** Si la DEK está guardada tras biometría (secure-store). No es secreto. */
+  biometricEnabled?: boolean;
 }
 
 interface ManifestFile {

@@ -13,6 +13,9 @@ extremo. Construido con **Expo (development build)** + **React Native** +
 - ✅ **Etapa 1** — Núcleo criptográfico: BD cifrada con SQLCipher (AES-256) +
   derivación de clave con Argon2id (parámetros OWASP). Una BD cifrada por
   usuario con clave propia (aislamiento criptográfico).
+- ✅ **Etapa 3** — Biometría + Android Keystore: la DEK se envuelve tras
+  `expo-secure-store` (`requireAuthentication`); la biometría desbloquea la
+  clave, con fallback obligatorio al master password.
 
 El detalle de la arquitectura y la hoja de ruta por etapas está en
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).

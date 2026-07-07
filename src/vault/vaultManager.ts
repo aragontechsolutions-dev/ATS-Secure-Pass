@@ -8,18 +8,20 @@
  *    (SQLCipher verifica la clave; si falla → master password incorrecto).
  *  - Bloquear: cerrar la BD. La DEK es transitoria y no se conserva en la sesión.
  *
- * La biometría (Etapa 3) se añadirá encima: guardará la DEK protegida por el
- * Keystore para saltarse la re-derivación, con fallback SIEMPRE al master
- * password.
+ * Biometría (Etapa 3): la DEK se guarda protegida por el Keystore
+ * (`secure-store` + `requireAuthentication`). La biometría DESBLOQUEA la DEK;
+ * el fallback al master password es SIEMPRE obligatorio (los cambios de
+ * enrolamiento biométrico invalidan la clave del Keystore).
  */
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import { deleteDek, readDek, storeDek } from '../auth/dekStore';
 import { deriveDek } from '../crypto/kdf';
 import { DEFAULT_ARGON2ID_PARAMS, type Argon2idParams } from '../crypto/params';
 import { generateSaltHex, randomUUID } from '../crypto/random';
 import { closeDatabase, openEncryptedDatabase } from '../db/database';
 import { VaultError } from '../db/errors';
-import { addUser, displayNameTaken, getUser } from './manifest';
+import { addUser, displayNameTaken, getUser, updateUser } from './manifest';
 
 /** Sesión abierta de una bóveda. Contiene la conexión desbloqueada. */
 export interface VaultSession {
@@ -99,4 +101,65 @@ export async function unlockVault(
 /** Bloquea la sesión: cierra la BD. La DEK ya no vive en memoria de JS. */
 export async function lockVault(session: VaultSession): Promise<void> {
   await closeDatabase(session.db);
+}
+
+// ---------------------------------------------------------------------------
+// Biometría (Etapa 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Activa el desbloqueo biométrico para un usuario.
+ *
+ * Verifica el master password (deriva la DEK y abre/cierra la BD para confirmar
+ * que es correcto), guarda la DEK protegida por biometría en el Keystore y marca
+ * el flag en el manifiesto. En Android, guardar puede pedir autenticación
+ * biométrica (se genera una clave fresca ligada a la biometría actual).
+ *
+ * Lanza `InvalidMasterPasswordError` si el master password es incorrecto, o
+ * `BiometricUnlockError('unavailable')` si el dispositivo no tiene biometría
+ * fuerte configurada.
+ */
+export async function enableBiometricUnlock(
+  userId: string,
+  masterPassword: string
+): Promise<void> {
+  const record = await getUser(userId);
+  if (!record) {
+    throw new VaultError('USER_NOT_FOUND', `No existe el usuario ${userId}.`);
+  }
+
+  const dekHex = await deriveDek(masterPassword, record.saltHex, record.kdf);
+  // Verifica el master password antes de guardar nada (abre y cierra).
+  const db = await openEncryptedDatabase(userId, dekHex);
+  await closeDatabase(db);
+
+  await storeDek(userId, dekHex);
+  await updateUser(userId, { biometricEnabled: true });
+}
+
+/** Desactiva el desbloqueo biométrico: borra la DEK del Keystore y limpia el flag. */
+export async function disableBiometricUnlock(userId: string): Promise<void> {
+  await deleteDek(userId);
+  await updateUser(userId, { biometricEnabled: false });
+}
+
+/**
+ * Desbloquea la bóveda con biometría: lee la DEK de secure-store (el sistema
+ * operativo exige la autenticación biométrica) y abre la BD.
+ *
+ * Lanza `BiometricUnlockError` si no se puede desbloquear con biometría (no
+ * activada, cancelada, o clave invalidada por cambio de biometría). El llamador
+ * DEBE caer entonces al desbloqueo por master password. Si el motivo es
+ * `invalidated`, tras el desbloqueo por master password conviene re-activar la
+ * biometría con `enableBiometricUnlock`.
+ */
+export async function unlockVaultWithBiometrics(userId: string): Promise<VaultSession> {
+  const record = await getUser(userId);
+  if (!record) {
+    throw new VaultError('USER_NOT_FOUND', `No existe el usuario ${userId}.`);
+  }
+
+  const dekHex = await readDek(userId);
+  const db = await openEncryptedDatabase(userId, dekHex);
+  return { userId, displayName: record.displayName, db };
 }

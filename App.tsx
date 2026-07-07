@@ -1,5 +1,5 @@
 /**
- * Banco de pruebas de la Etapa 1 (núcleo criptográfico).
+ * Banco de pruebas de las Etapas 1 y 3 (núcleo criptográfico + biometría).
  *
  * NO es la UI final de la app (eso es la Etapa 6). Es una pantalla de
  * diagnóstico para validar, sobre un dispositivo/development build real, que:
@@ -7,11 +7,13 @@
  *   2. La BD SQLCipher guarda y lee credenciales.
  *   3. Al bloquear y desbloquear, un master password incorrecto es rechazado.
  *   4. Argon2id tarda ~250–400 ms (benchmark) en el hardware objetivo.
+ *   5. La biometría desbloquea la DEK (Keystore) con fallback al master password.
  *
- * Requiere un development build (NO Expo Go): SQLCipher y Argon2 son nativos.
+ * Requiere un development build (NO Expo Go): SQLCipher, Argon2, biometría y
+ * secure-store con autenticación son nativos.
  */
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -22,13 +24,27 @@ import {
   View,
 } from 'react-native';
 
+import {
+  describeBiometrics,
+  getBiometricCapability,
+  type BiometricCapability,
+} from './src/auth/biometrics';
+import { BiometricUnlockError } from './src/auth/errors';
 import { benchmarkArgon2id } from './src/crypto/kdf';
 import { DEFAULT_ARGON2ID_PARAMS } from './src/crypto/params';
 import { countCredentials, createCredential, listCredentials } from './src/db/credentials';
 import { InvalidMasterPasswordError } from './src/db/errors';
 import type { Credential } from './src/db/credentials';
-import { createVault, lockVault, unlockVault, type VaultSession } from './src/vault/vaultManager';
-import { listUsers } from './src/vault/manifest';
+import {
+  createVault,
+  disableBiometricUnlock,
+  enableBiometricUnlock,
+  lockVault,
+  unlockVault,
+  unlockVaultWithBiometrics,
+  type VaultSession,
+} from './src/vault/vaultManager';
+import { listUsers, type UserRecord } from './src/vault/manifest';
 
 export default function App() {
   const scheme = useColorScheme();
@@ -45,9 +61,28 @@ export default function App() {
   const [credUser, setCredUser] = useState('');
   const [credPass, setCredPass] = useState('');
 
+  const [cap, setCap] = useState<BiometricCapability | null>(null);
+  const [users, setUsers] = useState<UserRecord[]>([]);
+
   const append = useCallback((line: string) => {
     setLog((prev) => [`${new Date().toLocaleTimeString()}  ${line}`, ...prev].slice(0, 40));
   }, []);
+
+  const refreshUsers = useCallback(async () => {
+    setUsers(await listUsers());
+  }, []);
+
+  useEffect(() => {
+    getBiometricCapability().then(setCap).catch(() => setCap(null));
+    refreshUsers();
+  }, [refreshUsers]);
+
+  /** Busca el registro de usuario que coincide con el nombre escrito. */
+  const findUser = useCallback(
+    (): UserRecord | undefined =>
+      users.find((u) => u.displayName.trim() === displayName.trim()),
+    [users, displayName]
+  );
 
   const run = useCallback(
     async (label: string, fn: () => Promise<void>) => {
@@ -88,13 +123,13 @@ export default function App() {
       const s = await createVault({ displayName, masterPassword });
       setSession(s);
       await refreshCreds(s);
+      await refreshUsers();
       append(`🔐 Bóveda creada y abierta para "${s.displayName}" (${s.userId.slice(0, 8)}…)`);
     });
 
   const onUnlock = () =>
     run('desbloquear', async () => {
-      const users = await listUsers();
-      const target = users.find((u) => u.displayName === displayName.trim());
+      const target = findUser();
       if (!target) {
         append(`ℹ️ No hay usuario "${displayName}". Crea la bóveda primero.`);
         return;
@@ -107,6 +142,64 @@ export default function App() {
       } catch (err) {
         if (err instanceof InvalidMasterPasswordError) {
           append('🚫 Master password incorrecto (SQLCipher rechazó la clave) ✅ esperado');
+          return;
+        }
+        throw err;
+      }
+    });
+
+  const onEnableBiometrics = () =>
+    run('activar biometría', async () => {
+      const target = findUser();
+      if (!target) {
+        append(`ℹ️ No hay usuario "${displayName}". Crea o abre la bóveda primero.`);
+        return;
+      }
+      if (!masterPassword) {
+        append('ℹ️ Escribe el master password para activar la biometría.');
+        return;
+      }
+      try {
+        await enableBiometricUnlock(target.id, masterPassword);
+        await refreshUsers();
+        append(`🔑 Biometría activada para "${target.displayName}" (DEK envuelta por el Keystore)`);
+      } catch (err) {
+        if (err instanceof InvalidMasterPasswordError) {
+          append('🚫 Master password incorrecto: no se activó la biometría');
+          return;
+        }
+        throw err;
+      }
+    });
+
+  const onDisableBiometrics = () =>
+    run('desactivar biometría', async () => {
+      const target = findUser();
+      if (!target) return;
+      await disableBiometricUnlock(target.id);
+      await refreshUsers();
+      append(`🗑️ Biometría desactivada para "${target.displayName}" (DEK borrada del Keystore)`);
+    });
+
+  const onUnlockBiometrics = () =>
+    run('desbloquear con biometría', async () => {
+      const target = findUser();
+      if (!target) {
+        append(`ℹ️ No hay usuario "${displayName}".`);
+        return;
+      }
+      try {
+        const s = await unlockVaultWithBiometrics(target.id);
+        setSession(s);
+        await refreshCreds(s);
+        append(`🔑 Desbloqueada con biometría (${await countCredentials(s.db)} credenciales)`);
+      } catch (err) {
+        if (err instanceof BiometricUnlockError) {
+          const hint =
+            err.reason === 'invalidated'
+              ? ' → usa el master password y vuelve a activar la biometría'
+              : ' → usa el master password';
+          append(`🔑❌ Biometría (${err.reason}): ${err.message}${hint}`);
           return;
         }
         throw err;
@@ -150,7 +243,7 @@ export default function App() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={[styles.title, { color: c.text }]}>ATS Secure Pass</Text>
         <Text style={[styles.subtitle, { color: c.muted }]}>
-          Etapa 1 · Diagnóstico del núcleo criptográfico
+          Etapas 1 + 3 · Núcleo criptográfico y biometría
         </Text>
 
         <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -188,6 +281,56 @@ export default function App() {
               kind="ghost"
             />
           </View>
+        </View>
+
+        <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+          <Text style={[styles.cardTitle, { color: c.text }]}>Biometría</Text>
+          <Text style={[styles.credMeta, { color: c.muted }]}>
+            {cap
+              ? `${describeBiometrics(cap)} · ${
+                  cap.canUseForVault
+                    ? 'disponible (Class 3) ✅'
+                    : cap.isEnrolled
+                      ? 'no es biometría fuerte (Class 2) ⚠️'
+                      : 'no configurada ⚠️'
+                }`
+              : 'Comprobando capacidades…'}
+          </Text>
+          {(() => {
+            const u = findUser();
+            const enabled = !!u?.biometricEnabled;
+            return (
+              <>
+                <Text style={[styles.credMeta, { color: c.muted }]}>
+                  Usuario "{displayName.trim() || '—'}":{' '}
+                  {u ? (enabled ? 'biometría activada 🔑' : 'biometría desactivada') : 'no existe'}
+                </Text>
+                <View style={styles.row}>
+                  <Button
+                    label="Activar biometría"
+                    onPress={onEnableBiometrics}
+                    disabled={busy || !cap?.canUseForVault || !u || enabled}
+                    c={c}
+                  />
+                  <Button
+                    label="Desbloq. huella"
+                    onPress={onUnlockBiometrics}
+                    disabled={busy || !u || !enabled}
+                    c={c}
+                  />
+                </View>
+                {enabled && (
+                  <Button
+                    label="Desactivar biometría"
+                    onPress={onDisableBiometrics}
+                    disabled={busy}
+                    c={c}
+                    kind="ghost"
+                  />
+                )}
+              </>
+            );
+          })()}
         </View>
 
         {session && (
