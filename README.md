@@ -19,6 +19,10 @@ extremo. Construido con **Expo (development build)** + **React Native** +
 - ✅ **Etapa 4** — Hardening: anti-captura (FLAG_SECURE), portapapeles con
   auto-borrado, auto-lock por segundo plano/inactividad y detección de root
   (jail-monkey).
+- 🟡 **Etapa 6 (parcial)** — App real con pantallas: Onboarding (crear bóveda),
+  Bloqueo (huella automática + contraseña maestra), Dashboard (lista/añadir/
+  copiar/mostrar credenciales) y Ajustes (⚙️). Falta pulido visual e iconos de
+  marca.
 
 El detalle de la arquitectura y la hoja de ruta por etapas está en
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).

@@ -20,7 +20,7 @@ arquitectura y el estado de implementación por etapas.
 | 3 | **Biometría + Android Keystore (wrap de la DEK)** | ✅ Hecho |
 | 4 | **Hardening (FLAG_SECURE, portapapeles, auto-lock, root)** | ✅ Hecho |
 | 5 | Backup / restore cifrado | ⬜ Pendiente |
-| 6 | UI/UX final (iconos de marca, mostrar/ocultar, copiar) | ⬜ Pendiente |
+| 6 | UI/UX: shell de app con pantallas reales | 🟡 App real (Onboarding/Lock/Dashboard/Settings); falta pulido e iconos de marca |
 | 7 | Auditoría contra el perfil MAS-L2 del MASTG | ⬜ Pendiente |
 
 La Etapa 2 tiene su cimiento ya construido: el modelo de datos es **una BD
@@ -117,12 +117,37 @@ src/
 │   ├── manifest.ts      # metadatos no secretos por usuario (salt, KDF, flag biometría)
 │   ├── vaultManager.ts  # crear / desbloquear / bloquear + activar/usar biometría
 │   └── index.ts
+├── ui/
+│   ├── theme.ts          # paleta claro/oscuro + useTheme
+│   ├── components.tsx    # Button, Card, Field, PasswordField (ojo), GearButton, …
+│   ├── useController.ts  # estado global + acciones (el "cerebro" de la app)
+│   └── screens/
+│       ├── OnboardingScreen.tsx  # crear la primera bóveda
+│       ├── LockScreen.tsx        # huella automática + fallback master password
+│       ├── DashboardScreen.tsx   # lista/añadir/copiar/mostrar credenciales
+│       └── SettingsScreen.tsx    # ⚙️ biometría, auto-lock, integridad, diagnóstico
 └── types/
     └── react-native-argon2.d.ts  # tipos del módulo Argon2 (no trae .d.ts)
 
-tests/                # tests de lógica pura (Node): encoding, params, salt Argon2
-App.tsx               # banco de pruebas de diagnóstico (Etapas 1 + 3)
+tests/                # tests de lógica pura (Node): encoding, params, salt, seguridad
+App.tsx               # shell: enruta por fase (loading/onboarding/locked/unlocked)
 ```
+
+### Flujo de la app (navegación por estado, sin librería nativa)
+
+`useController` deriva la fase a partir del estado:
+
+```
+loading ─▶ ¿hay usuarios?
+             │ no ─▶ onboarding (crear bóveda)
+             │ sí ─▶ locked ──(huella auto / master password)──▶ unlocked
+                                                                   │
+                                                    dashboard ⇄ settings (⚙️)
+```
+
+Al abrir, si el usuario activo tiene biometría activada, la `LockScreen` lanza la
+huella automáticamente. Todos los ajustes técnicos (biometría, auto-lock,
+integridad, benchmark) viven en `SettingsScreen`, accesible con la rueda dentada.
 
 ### Qué es testeable en CI vs. en dispositivo
 
