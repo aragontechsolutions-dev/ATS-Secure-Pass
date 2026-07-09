@@ -31,7 +31,8 @@ extremo. Construido con **Expo (development build)** + **React Native** +
   en una carpeta del teléfono.
 
 El detalle de la arquitectura y la hoja de ruta por etapas está en
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), y la autoevaluación de seguridad
+(perfil MAS-L2) en [`docs/SECURITY-AUDIT.md`](docs/SECURITY-AUDIT.md).
 
 ## Puesta en marcha
 

@@ -117,16 +117,31 @@ export async function getCredential(
   return row ? rowToCredential(row) : null;
 }
 
+/**
+ * Columnas actualizables permitidas. Los nombres de columna NUNCA se
+ * interpolan sin pasar por esta whitelist (defensa ante inyección por nombre de
+ * columna, aunque el `patch` provenga de código tipado).
+ */
+const UPDATABLE_COLUMNS: readonly (keyof CredentialUpdate)[] = [
+  'title',
+  'username',
+  'password',
+  'url',
+  'notes',
+  'icon',
+  'category',
+];
+
 /** Actualiza los campos indicados de una credencial. Devuelve filas afectadas. */
 export async function updateCredential(
   db: SQLiteDatabase,
   id: string,
   patch: CredentialUpdate
 ): Promise<number> {
-  const fields = Object.keys(patch) as (keyof CredentialUpdate)[];
+  // Solo columnas de la whitelist (los valores siguen yendo parametrizados).
+  const fields = UPDATABLE_COLUMNS.filter((f) => f in patch);
   if (fields.length === 0) return 0;
 
-  // Mapa de nombres de campo TS → columnas SQL (todas snake_case iguales aquí).
   const assignments = fields.map((f) => `${f} = ?`).join(', ');
   const values = fields.map((f) => patch[f] ?? null);
 

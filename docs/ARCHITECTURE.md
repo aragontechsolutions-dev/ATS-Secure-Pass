@@ -20,8 +20,8 @@ arquitectura y el estado de implementación por etapas.
 | 3 | **Biometría + Android Keystore (wrap de la DEK)** | ✅ Hecho |
 | 4 | **Hardening (FLAG_SECURE, portapapeles, auto-lock, root)** | ✅ Hecho |
 | 5 | **Backup / restore cifrado** | ✅ Hecho |
-| 6 | UI/UX: shell de app con pantallas reales | 🟡 App real (Onboarding/Lock/Dashboard/Settings); falta pulido e iconos de marca |
-| 7 | Auditoría contra el perfil MAS-L2 del MASTG | ⬜ Pendiente |
+| 6 | UI/UX: shell de app con pantallas reales | ✅ App real (Onboarding/Lock/Dashboard/Settings) + iconos de marca + animaciones |
+| 7 | **Auditoría contra el perfil MAS-L2 del MASTG** | ✅ Autoevaluación ([`SECURITY-AUDIT.md`](SECURITY-AUDIT.md)); pendiente MobSF sobre el APK |
 
 La Etapa 2 tiene su cimiento ya construido: el modelo de datos es **una BD
 cifrada por usuario, cada una con su propia clave**. Falta el selector de
