@@ -259,6 +259,14 @@ export function ConfirmDialog({
   );
 }
 
+/** Texto de crédito de autoría, mostrado en varias pantallas. */
+export const APP_CREDIT = 'Desarrollado y mantenido por ATS - Aragon Tech Solutions';
+
+/** Pie de autoría reutilizable. */
+export function Credit({ theme, style }: { theme: Theme; style?: object }) {
+  return <Text style={[styles.credit, { color: theme.muted }, style]}>{APP_CREDIT}</Text>;
+}
+
 export const uiStyles = StyleSheet.create({
   buttonRow: { flexDirection: 'row', gap: 10 },
 });
@@ -322,4 +330,5 @@ const styles = StyleSheet.create({
   dialogTitle: { fontSize: 18, fontWeight: '700' },
   dialogMsg: { fontSize: 14.5, lineHeight: 21 },
   dialogRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  credit: { fontSize: 12, textAlign: 'center', marginTop: 8, lineHeight: 17 },
 });

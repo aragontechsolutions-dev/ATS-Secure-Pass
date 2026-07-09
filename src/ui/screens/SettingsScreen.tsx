@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 
 import { describeBiometrics } from '../../auth/biometrics';
-import { Button, Card, Notice, PasswordField, Row, ScreenHeader } from '../components';
+import { Button, Card, Credit, Notice, PasswordField, Row, ScreenHeader } from '../components';
 import type { Controller } from '../useController';
 import { useTheme } from '../theme';
 
@@ -126,6 +126,7 @@ export function SettingsScreen({ c }: { c: Controller }) {
         <Text style={[styles.footer, { color: theme.muted }]}>
           ATS Secure Pass · cifrado SQLCipher (AES-256) + Argon2id · sin contraseña por defecto
         </Text>
+        <Credit theme={theme} />
       </ScrollView>
     </View>
   );

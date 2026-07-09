@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Button, Card, Field, Notice, PasswordField, ScreenHeader } from '../components';
+import { Button, Card, Credit, Field, Notice, PasswordField, ScreenHeader } from '../components';
 import type { Controller } from '../useController';
 import { useTheme } from '../theme';
 
@@ -78,6 +78,8 @@ export function OnboardingScreen({ c }: { c: Controller }) {
           </Text>
           <Button theme={theme} label="Restaurar desde backup" kind="ghost" onPress={c.importBackup} disabled={c.busy} />
         </Card>
+
+        <Credit theme={theme} />
       </ScrollView>
     </View>
   );

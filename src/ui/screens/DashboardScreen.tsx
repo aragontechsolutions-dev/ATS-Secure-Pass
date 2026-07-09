@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 
 import type { Credential } from '../../db/credentials';
 import { BrandIcon } from '../brandIcon';
-import { Button, Card, ConfirmDialog, Field, GearButton, Notice, PasswordField, ScreenHeader } from '../components';
+import { Button, Card, ConfirmDialog, Credit, Field, GearButton, Notice, PasswordField, ScreenHeader } from '../components';
 import { clampPage, filterCredentials, pageCount, paginate } from '../credentialQuery';
 import { FadeSlideIn } from '../motion';
 import type { Controller } from '../useController';
@@ -147,6 +147,8 @@ export function DashboardScreen({ c }: { c: Controller }) {
         ) : null}
 
         <Button theme={theme} label="🔒 Bloquear bóveda" kind="ghost" onPress={() => c.lock('manual')} />
+
+        <Credit theme={theme} />
       </ScrollView>
 
       <ConfirmDialog

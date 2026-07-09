@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { Button, Card, Notice, PasswordField, ScreenHeader } from '../components';
+import { Button, Card, Credit, Notice, PasswordField, ScreenHeader } from '../components';
 import { PopIn } from '../motion';
 import type { Controller } from '../useController';
 import { useTheme } from '../theme';
@@ -94,6 +94,8 @@ export function LockScreen({ c }: { c: Controller }) {
             loading={c.busy}
           />
         </Card>
+
+        <Credit theme={theme} />
       </ScrollView>
     </View>
   );
